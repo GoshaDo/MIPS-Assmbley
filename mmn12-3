@@ -1,0 +1,262 @@
+########## Ahoutr : George (Gosha) Dozorets Date:8/7/2021
+########## assignment from MIPS CPU : MMN 12 Q3
+################# Data segment ###########################
+.data
+InputAsk: .asciiz "Please enter some words: "
+InputErrorPrint: .asciiz "invalid input, please try again.\n"
+InputErrorSpace: .asciiz "too much spaces included.\n"
+InputErrorSpaceSecond: .asciiz "last char can't be space.\n"
+StringBuffer: .space 81 #space for the input data
+MinWordBuffer: .space 81 #space for the input data
+MaxWordBuffer: .space 81 #space for the input data
+NewLine: .asciiz "\n"
+Space: .asciiz " "
+FirstOutput: .asciiz "Number of words = "
+SecondOutput: .asciiz "Letters in longest word = "
+ThirdOutput: .asciiz "Letters in shortest word = "
+FourOutput: .asciiz "Difference =  "
+FiveOutput: .asciiz "Total number of letters = "
+SixOutput: .asciiz "The longest word = "
+SevenOutput: .asciiz "The shortest word = "	
+
+################# Code segment #####################
+	
+.text
+.global main
+main: 
+	#print Input ask from user
+	la $a0,InputAsk
+	li $v0,4
+	syscall
+	
+	#input from user
+	li $v0, 8
+	la $a0,StringBuffer  #address of input buffer 
+	li $a1,81 #maximum number of characters to read
+	syscall
+	
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	#loop throw StringBuffer and check 
+	#while StringBuffer != EOF
+	la $t0,StringBuffer #$t0 StringBuffer pointer
+	lb $t1,0($t0) #$get value of $t0 into $t1
+	beq $t1,$0,Error_ilegal_ascii #check if we in end of string
+	beq $t1,10,Error_ilegal_ascii #check if first char is \n
+	
+loop_and_check_string_buffer:
+	lb $t1,($t0) #$get value of $t0 into $t1
+	beq $t1,$0,check_last_char #check if we in end of string
+	
+	#check if contains valid ascii codes a-z (97-122) A-Z(65-90) \n(10) or space (32) 
+	beq $t1,32,legal_char #checks if space 
+	beq $t1,10,legal_char #checks if \n
+	
+	li $t6,0 #reset $t6
+	li $t7,0 #reset $t7
+	slti $t6,$t1,123 #if val <123
+	li $t4,96        
+	slt $t7,$t4,$t1 #and val >96
+	and $t6,$t6,$t7
+	beq $t6,1,legal_char
+	
+	li $t6,0 #reset $t5
+	li $t7,0 #reset $t7
+	slti $t6,$t1,91 #if val <91
+	li $t4,64        
+	slt $t7,$t4,$t1 #and val >64
+	and $t6,$t6,$t7
+	beq $t6,1,legal_char
+
+	j Error_ilegal_ascii
+	
+legal_char:
+	#check if contains at least two spaces in row
+	bne $t1,32,continute_loop #if current char not space continue loop
+	lb $t3,1($t0) #get next char
+	beq $t3,$0,continute_loop #check if next char is zero
+	beq $t1,$t3,Error_too_much_spaces
+continute_loop:
+	#end loop sturctre
+	addi $t0,$t0,1 # to the next char in string
+	j loop_and_check_string_buffer
+	
+check_last_char:
+	lb $t1,-2($t0)
+	beq $t1,32,Error_too_much_spaces_second
+# ................done checking...............................
+no_errors:
+	li $t3,0 #reset wordLengthCounter
+	li $s3,-1 #reset maxLengthWordAdress
+	li $s4,-1 #reset minLengthWordAdress
+	li $s1,0 #reset maxLengthword
+	li $s2,82 #reset minLengthWord
+	li $s0,0 #reset wordCounter
+	li $s5,0 #reset charCounter
+	
+	la $t0,StringBuffer #$t0 StringBuffer pointer
+	lb $t1,($t0) #load first value
+	beq $t1,32,analyze #if first char is not space add 1 to word counter
+	addi $s0,$s0,1 #add 1 to wordCounter
+
+analyze:
+	lb $t1,($t0) #get first char at index
+	beq $t1,10,fill_buffers #check if we in end of string
+	lb $t2,1($t0) #get second char
+
+	bne $t1,32,startOfWord #if current char=spce -> next char is word then wordCounter++ else continue
+	addi $s0,$s0,1 # wordCoutner++
+	j continue_loop2
+startOfWord:
+	addi $t3,$t3,1	#wordLengthCounter ++
+	addi $s5,$s5,1	#charCounter ++ 
+	
+	seq $t4,$t2,10 #check if next element is \n
+	seq $t5,$t2,32 #check if next element is space
+	or $t4,$t4,$t5 #if nextElement != char $t4=1
+
+	beq $t4,0,continue_loop2
+	#end of word methods
+	slt $t4,$t3,$s1 # if maxLengthWord <= wordLengthCounter -> $t4=0
+	beq $t4,1,nextMethod
+	move $s1,$t3 #maxLengthWord = wordLengthCounter
+	#maxLengthWordAdress = currentAdress+1-wordLengthCounter
+	move $s3,$t0
+	addi $s3,$s3,1
+	sub $s3,$s3,$t3
+nextMethod:
+	slt $t4,$s2,$t3 # if minLengthWord >= wordLengthCounter -> $t4=0
+	beq $t4,1,reset_counter
+	move $s2,$t3 #minLengthWord = wordLengthCounter
+	#minLengthWordAdrees = currentAdress+1-wordLengthCounter)
+	move $s4,$t0
+	addi $s4,$s4,1
+	sub $s4,$s4,$t3
+reset_counter: #wordLengthCounter = 0
+	li $t3,0
+continue_loop2:
+	addi $t0,$t0,1 # to the next buffer element
+	j analyze
+
+
+fill_buffers:
+	la $t0,MaxWordBuffer #load max buffer word adress
+	la $t1,MinWordBuffer #load max buffer word adress
+	#fill max buffer
+fill_max_buffer:
+	lb $t5,($s3) #get first char
+	sb $t5,($t0)
+	lb $t3,1($s3) #get next char
+	beq $t3,32,fill_min_buffer
+	beq $t3,10,fill_min_buffer
+	addi $s3,$s3,1 #move word pointer to next element
+	addi $t0,$t0,1
+	j fill_max_buffer
+#fill min buffer
+fill_min_buffer:
+	lb $t6,($s4) #get first char
+	sb $t6,($t1)
+	lb $t4,1($s4) #get next char
+	beq $t4,32,Exit_code
+	beq $t4,10,Exit_code
+	addi $s4,$s4,1 #move word pointer to next element
+	addi $t1,$t1,1
+	j fill_min_buffer
+	
+Exit_code:
+	la $a0,FirstOutput
+	li $v0,4
+	syscall
+	move $a0,$s0
+	li $v0,1
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	la $a0,SecondOutput
+	li $v0,4
+	syscall
+	move $a0,$s1
+	li $v0,1
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	la $a0,ThirdOutput
+	li $v0,4
+	syscall
+	move $a0,$s2
+	li $v0,1
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	la $a0,FourOutput
+	li $v0,4
+	syscall
+	sub $t4,$s1,$s2
+	move $a0,$t4
+	li $v0,1
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	la $a0,FiveOutput
+	li $v0,4
+	syscall
+	move $a0,$s5
+	li $v0,1
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+
+			
+	la $a0,SixOutput
+	li $v0,4
+	syscall
+	la $a0,MaxWordBuffer
+	li $v0,4
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	la $a0,SevenOutput
+	li $v0,4
+	syscall
+	la $a0,MinWordBuffer
+	li $v0,4
+	syscall
+	la $a0,NewLine
+	li $v0,4
+	syscall
+	
+	#exit program
+	li $v0,10
+	syscall
+
+Error_ilegal_ascii:
+	la $a0,InputErrorPrint
+	li $v0,4
+	syscall
+	j main
+	
+Error_too_much_spaces:
+	la $a0,InputErrorSpace
+	li $v0,4
+	syscall
+	j main
+
+Error_too_much_spaces_second:
+	la $a0,InputErrorSpaceSecond
+	li $v0,4
+	syscall
+	j main
+
